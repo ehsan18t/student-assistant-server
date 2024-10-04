@@ -139,8 +139,6 @@ GitHub.sublime-settings
 # Custom
 node_modules/
 uploads/*
-*/migrations/*
 .env.local
 !sampleDB/*
-!*/migrations/__init__.py
 !media/profile_pictures/avatar-male.png
