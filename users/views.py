@@ -1,7 +1,10 @@
+from calendar import calendar
+
 from django.conf import settings
 from djoser.social.views import ProviderAuthView
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import (
@@ -9,7 +12,9 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView
 )
-
+import re
+import requests
+from bs4 import BeautifulSoup
 from users.models import UserAccount
 from users.permissions import AdminToStudent
 from users.serializers import UserAccountSerializer
@@ -127,3 +132,53 @@ def get_user_by_id(request):
     serializer = UserAccountSerializer(user, many=False)
 
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_calendar(request):
+    url = 'https://www.uiu.ac.bd/academics/calendar/'
+    data = []
+
+    try:
+        # Fetch the webpage
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad responses
+        print("Successfully fetched the webpage!")
+
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'html.parser')
+        calendar_items = soup.find_all('div')
+
+        # Navigate to the relevant section
+        cal = calendar_items[0].find_next(class_='calender-table').find_next(class_='calender-table')
+        table = cal.find_next('table').find_next('tbody').find_all('tr')
+
+        # Extract data from the table rows
+        for row in table:
+            date = row.find_all('td')[0].get_text(strip=True)
+            day = row.find_all('td')[1].get_text(strip=True)
+            details = row.find_all('td')[2].get_text()
+
+            # Replace multiple newlines with a single newline and remove extra spaces
+            details = re.sub(r'\s*\n\s*', '\n', details).strip()
+
+            data.append({
+                'date': date,
+                'day': day,
+                'details': details,
+            })
+
+    except requests.RequestException as e:
+        print(f"HTTP error: {e}")
+        return Response({"error": "Failed to retrieve the webpage."}, status=500)
+    except IndexError:
+        print("Error: Unexpected HTML structure.")
+        return Response({"error": "Failed to retrieve the data."}, status=500)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return Response({"error": "An unexpected error occurred."}, status=500)
+
+    return Response({"data": data})
+
+
