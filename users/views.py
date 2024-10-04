@@ -136,7 +136,7 @@ def get_user_by_id(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def get_calendar(request):
+def get_calendar(req):
     url = 'https://www.uiu.ac.bd/academics/calendar/'
     data = []
 
@@ -179,6 +179,47 @@ def get_calendar(request):
         print(f"Unexpected error: {e}")
         return Response({"error": "An unexpected error occurred."}, status=500)
 
-    return Response({"data": data})
+    return Response({"calendar": data})
 
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_notice(req):
+    url = 'https://www.uiu.ac.bd/notice/'
+    data = []
+
+    try:
+        # Fetch the webpage
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad responses
+        print("Successfully fetched the webpage!")
+
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'html.parser')
+        notice_grid = soup.find('div', {"id": "notice-container"})
+        notices = notice_grid.find_all('div', class_='notice')
+
+        # Extract data from the table rows
+        for notice in notices:
+            date = notice.find_next('span', class_='date').getText(strip=True)
+            a = notice.find_next('a')
+            title = a.getText(strip=True)
+            link = a.get('href')
+            data.append({
+                'date': date,
+                'title': title,
+                'link': link,
+            })
+
+    except requests.RequestException as e:
+        print(f"HTTP error: {e}")
+        return Response({"error": "Failed to retrieve the webpage."}, status=500)
+    except IndexError:
+        print("Error: Unexpected HTML structure.")
+        return Response({"error": "Failed to retrieve the data."}, status=500)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return Response({"error": "An unexpected error occurred."}, status=500)
+
+    return Response({"notices": data})
